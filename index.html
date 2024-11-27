@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>九宫格数据处理</title>
+    <style>
+        /* 全局样式重置，去除默认的边距和填充，使页面布局更可控 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* 页面整体样式设置 */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+
+        input[type="text"] {
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            margin-right: 10px;
+            font-size: 30px;
+            width: calc(40% - 10px);
+        }
+
+        button {
+            padding: 18px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            font-size: 24px;
+            width: 250px;
+            height: 70px;
+        }
+        #handleButton {
+            width: 450px; /* 单独设置提交按钮的宽度 */
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        /* 结果展示区域样式设置 */
+        #resultDiv {
+            background-color: white;
+            padding: 30px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+            margin-top: 40px;
+            width: 100%;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        table th,
+        table td {
+            border: 1px solid #ccc;
+            padding: 20px;
+            text-align: center;
+            font-size: 24px;
+        }
+
+          /* 表头样式 */
+      th {
+          position: sticky;
+          top: 0;
+          background-color: #f0f0f0;
+          color: #333;
+          z-index: 10;
+      }
+
+        /* 提示信息样式 */
+        .success-tip {
+            background-color: #007BFF;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            margin-top: 10px;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        /* 输入区域样式设置，将输入框和按钮横向布局 */
+        .input-section {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            justify-content: space-between; /* 确保子元素分散对齐 */
+            margin-top: 20px;
+        }
+      /* 清除历史数据按钮样式 */
+      .clear-history-button {
+          position: sticky; /* 粘性定位 */
+          left: 0; /* 距离左边0像素，即页面最左端 */
+          background-color: #FF4500;
+          color: white;
+          padding: 18px;
+          border: none;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: background-color 0.3s ease;
+          z-index: 100; /* 确保按钮在表格上方 */
+      }
+
+      .clear-history-button:hover {
+          background-color: #FF8C00;
+      }
+
+      /* 删除最后一行按钮样式 */
+      .delete-last-row-button {
+          position: sticky; /* 粘性定位 */
+          right: 0; /* 距离右边0像素，即页面最右端 */
+          background-color: #008000;
+          color: white;
+          padding: 18px;
+          border: none;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: background-color 0.3s ease;
+          z-index: 100; /* 确保按钮在表格上方 */
+      }
+
+      .delete-last-row-button:hover {
+          background-color: #006400;
+      }
+    </style>
+</head>
+<body>
+
+    <!-- 结果展示区域 -->
+    <div id="resultDiv"></div>
+
+    <div class="input-section">
+        <!-- 输入A列数据的输入框 -->
+        <input type="text" id="aInput" placeholder="请输入A列数据">
+
+        <!-- 输入B列数据的输入框 -->
+        <input type="text" id="bInput" placeholder="请输入B列数据">
+
+        <!-- 处理输入与提交数据按钮 -->
+        <button id="handleButton">提交</button>
+
+        <!-- 清除历史数据按钮，放在最左端 -->
+        <button class="clear-history-button" id="clearHistoryButton">清除历史数据</button>
+
+        <!-- 删除最后一行按钮，放在最右端 -->
+        <button class="delete-last-row-button" id="deleteLastRowButton">删除最后一行</button>
+    </div>
+
+    <div id="successTip" class="success-tip"></div>
+
+    <script>
+        // 获取页面中的各个DOM元素
+        const aInput = document.getElementById('aInput');
+        const bInput = document.getElementById('bInput');
+        const handleButton = document.getElementById('handleButton');
+        const clearHistoryButton = document.getElementById('clearHistoryButton');
+        const deleteLastRowButton = document.getElementById('deleteLastRowButton');
+        const resultDiv = document.getElementById('resultDiv');
+        const successTip = document.getElementById('successTip');
+
+        // 用于存储处理后的结果数据
+        let processedData = [];
+
+        // 用于存储要发送到后端的A列和B列数据（现在在前端模拟处理，不再真正发送到后端）
+        let data = {
+            'A': [],
+            'B': []
+        };
+
+        // 验证输入是否为长度为3的数字字符串的函数
+// 验证输入是否为长度为3的数字字符串的函数
+function isValidThreeDigitInput(input) {
+    return typeof input === 'string' && input.length === 3 && /^\d+$/.test(input);
+}
+
+// 模拟后端的compare_strings函数逻辑，在前端进行数据处理
+function compareStrings(df) {
+    let result_df = {
+        'A': [],
+        'B': [],
+        'C': [],
+        'D': [],
+        'E': [],
+        'F': [],
+        'G': [],
+        'H': [],
+        'I': [],
+        'J': [],
+        'K': [],
+        'L': [],
+        'M': [],
+        'N': [],
+        'O': [],
+        'P': []
+    };
+
+    result_df['A'] = df['A'].slice(); // 复制A列
+    result_df['B'] = df['B'].slice(); // 复制B列
+
+    for (let index = 0; index < df['A'].length; index++) {
+        if (index < 3) {
+            // 前三行不进行计算，C、D、E、F、G、H、I、J、K、L、M、N列留空或设为None
+            ['C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P'].forEach(letter => {
+                result_df[letter].push(null);
+            });
+        } else {
+            // 从第四行开始计算
+            let all_a_nums_prev = new Set();
+            let all_b_nums_prev = new Set();
+            for (let i = Math.max(0, index - 3); i < index; i++) {
+                let prev_a_str = df['A'][i];
+                let prev_a_nums = new Set(prev_a_str.split('').map(x => parseInt(x)));
+                all_a_nums_prev = new Set([...all_a_nums_prev, ...prev_a_nums]);
+                let prev_b_str = df['B'][i];
+                let prev_b_nums = new Set(prev_b_str.split('').map(x => parseInt(x)));
+                all_b_nums_prev = new Set([...all_b_nums_prev, ...prev_b_nums]);
+            }
+
+            let current_b_str = df['B'][index];
+            let current_b_nums = new Set(current_b_str.split('').map(x => parseInt(x)));
+
+            // 统计交集元素个数，把重复元素当作多个来统计
+            let intersection_a_b = [...current_b_nums].filter(num => all_a_nums_prev.has(num)).length;
+
+            // 统计交集元素个数，把重复元素当作多个来统计（用于F列）
+            let intersection_b_b = [...current_b_nums].filter(num => all_b_nums_prev.has(num)).length;
+
+            // 计算交集并存储结果到D列，按照重复元素多次统计的结果
+            result_df['D'].push(intersection_a_b);
+
+            // 计算交集并存储结果到F列，按照重复元素多次统计的结果
+            result_df['F'].push(intersection_b_b);
+
+            // 计算交集并存储结果到H列，按照重复元素多次统计的结果
+            let intersection_count = [...current_b_nums].filter(num => all_a_nums_prev.has(num) && all_b_nums_prev.has(num)).length;
+            result_df['H'].push(intersection_count);
+
+            // 更新其他列
+            result_df['C'].push(`{${Array.from(all_a_nums_prev).join(', ')}: ${all_a_nums_prev.size}}`);
+            result_df['E'].push(`{${Array.from(all_b_nums_prev).join(', ')}: ${all_b_nums_prev.size}}`);
+
+            result_df['G'].push(`{${Array.from(all_a_nums_prev).filter(num => all_b_nums_prev.has(num)).join(', ')}}`);
+            let b_int_value = parseInt(current_b_str);
+            let remainder_3 = b_int_value % 3;
+            let a = Math.floor(b_int_value / 100);
+            let b = Math.floor((b_int_value % 100) / 10);
+            let c = b_int_value % 10;
+            // 判断大小并填充 M 列
+            result_df['M'].push((0 <= a && a <= 4 && 0 <= b && b <= 4 && 0 <= c && c <= 4) ? '小小小' :
+                     (5 <= a && a <= 9 && 5 <= b && b <= 9 && 5 <= c && c <= 9) ? '大大大' :
+                     `${(0 <= a && a <= 4 ? '小' : '大')}${(0 <= b && b <= 4 ? '小' : '大')}${(0 <= c && c <= 4 ? '小' : '大')}`);
+
+            result_df['L'].push((a + b + c) % 10);
+            let small_count = [a, b, c].filter(x => 0 <= x && x <= 4).length;
+            let large_count = [a, b, c].filter(x => 5 <= x && x <= 9).length;
+            result_df['N'].push(`${small_count}:${large_count}`);
+            // 计算奇偶个数的比例并填充 P 列
+            let odd_count = [a, b, c].filter(x => x % 2 !== 0).length;
+            let even_count = [a, b, c].filter(x => x % 2 === 0).length;
+            result_df['P'].push(`${odd_count}:${even_count}`);
+
+            let o_status = `${(a % 2 === 0) ? '偶' : '奇'}${(b % 2 === 0) ? '偶' : '奇'}${(c % 2 === 0) ? '偶' : '奇'}`;
+            result_df['O'].push(o_status);
+
+            if (remainder_3 === 0) {
+                result_df['I'].push(remainder_3);
+                result_df['J'].push(null);
+                result_df['K'].push(null);
+            } else if (remainder_3 === 1) {
+                result_df['J'].push(remainder_3);
+                result_df['K'].push(null);
+                result_df['I'].push(null);
+            } else if (remainder_3 === 2) {
+                result_df['K'].push(remainder_3);
+                result_df['J'].push(null);
+                result_df['I'].push(null);
+            }
+        }
+    }
+
+    return result_df;
+}
+
+
+        // 处理输入与提交数据按钮的点击事件处理函数
+        handleButton.addEventListener('click', function () {
+            const aValue = aInput.value;
+            const bValue = bInput.value;
+
+            // 验证A列和B列输入数据格式是否符合要求
+            if (!isValidThreeDigitInput(aValue) || !isValidThreeDigitInput(bValue)) {
+                alert('请输入长度为3的纯数字字符串');
+                return;
+            }
+
+            // 将符合格式的A列和B列数据分别添加到本地数据结构中
+            data['A'].push(aValue);
+            data['B'].push(bValue);
+
+            // 清空输入框内容，以便下一次输入
+            aInput.value = "";
+            bInput.value = "";
+
+            // 检查是否已经捕获了足够的数据（A列和B列都有数据）
+            if (data['A'].length === 0 || data['B'].length === 0) {
+                alert('请先捕获足够的数据再提交！');
+                return;
+            }
+
+            // 显示数据添加成功的提示信息
+            successTip.textContent = "数据添加成功！";
+            successTip.style.opacity = "1";
+            setTimeout(() => {
+                successTip.style.opacity = "0";
+            }, 2000);
+
+            // 将本地数据转换为类似DataFrame结构的数据（这里简单使用对象数组模拟）
+            let df = {
+                'A': data['A'],
+                'B': data['B']
+            };
+
+            // 调用模拟的compare_strings函数进行数据处理
+            processedData = compareStrings(df);
+
+            // 调用结果展示函数更新前端展示
+            displayResult(processedData);
+        });
+
+        // 清除历史数据按钮的点击事件处理函数
+        clearHistoryButton.addEventListener('click', function () {
+            // 弹出确认对话框
+            const confirmClear = confirm("您确定要清除所有历史数据吗？");
+            if (!confirmClear) {
+                // 用户点击了取消，不执行任何操作
+                return;
+            }
+
+            // 清空本地存储的数据
+            data['A'] = [];
+            data['B'] = [];
+            processedData = [];
+
+            // 更新前端展示，清空结果展示区域
+            resultDiv.innerHTML = "";
+
+            alert('历史数据已成功清除！');
+        });
+
+        // 删除最后一行按钮的点击事件处理函数
+        deleteLastRowButton.addEventListener('click', function () {
+            if (data['A'].length > 0 && data['B'].length > 0) {
+                data['A'].pop();
+                data['B'].pop();
+
+                // 将本地数据转换为类似DataFrame结构的数据（这里简单使用对象数组模拟）
+                let df = {
+                    'A': data['A'],
+                    'B': data['B']
+                };
+
+                // 调用模拟的compare_strings函数进行数据处理
+                processedData = compareStrings(df);
+
+                // 调用结果展示函数更新前端展示
+                displayResult(processedData);
+
+                alert('最后一行数据删除成功！');
+            } else {
+                alert('没有数据可删除');
+            }
+        });
+
+    // 用于展示处理结果的函数
+    function displayResult() {
+        // 清空结果展示区域的原有内容
+        resultDiv.innerHTML = "";
+        // 创建一个用于展示结果的表格元素
+        const table = document.createElement('table');
+        const headerRow = document.createElement('tr');
+
+        // 创建表头行，设置各列的标题
+        const headers = ['数', '--试--', '--定--', '试', 'D列', '定', 'F列', '胆', 'H列', '0', '1', '2', '尾值', '大小', '比', '奇偶', '比'];
+        headers.forEach(header => {
+            const th = document.createElement('th');
+            th.textContent = header;
+            headerRow.appendChild(th);
+        });
+
+        // 将表头行添加到表格中
+        table.appendChild(headerRow);
+
+        // 遍历处理后的结果数据，填充表格每一行的数据
+        for (let i = 0; i < processedData['A'].length; i++) {
+            const row = document.createElement('tr');
+
+            // 创建索引列单元格，索引从1开始
+            const indexCell = document.createElement('td');
+            indexCell.textContent = i + 1;
+            row.appendChild(indexCell);
+
+            // 创建A列单元格，显示A列对应的数据
+            const aCell = document.createElement('td');
+            aCell.textContent = processedData['A'][i];
+            row.appendChild(aCell);
+
+            // 创建B列单元格，显示B列对应的数据
+            const bCell = document.createElement('td');
+            bCell.textContent = processedData['B'][i];
+            row.appendChild(bCell);
+
+            const cCell = document.createElement('td');
+            cCell.textContent = processedData['C'] && processedData['C'].length > i ? processedData['C'][i] : '';
+            cCell.style.backgroundColor = '#bed9d7';
+            row.appendChild(cCell);
+
+            // 创建D列单元格，根据是否存在对应数据进行显示，不存在则显示为空字符串
+            const dCell = document.createElement('td');
+            dCell.textContent = processedData['D'] && processedData['D'].length > i ? processedData['D'][i] : '';
+            dCell.style.backgroundColor = '#fff5e6';
+            row.appendChild(dCell);
+
+            // 创建E列单元格，根据是否存在对应数据进行显示，不存在则显示为空字符串
+            const eCell = document.createElement('td');
+            eCell.textContent = processedData['E'] && processedData['E'].length > i ? processedData['E'][i] : '';
+            eCell.style.backgroundColor = '#bed9d7';
+            row.appendChild(eCell);
+
+            // 创建F列单元格，根据是否存在对应数据进行显示，不存在则显示为空字符串
+            const fCell = document.createElement('td');
+            fCell.textContent = processedData['F'] && processedData['F'].length > i ? processedData['F'][i] : '';
+            fCell.style.backgroundColor = '#fff5e6';
+            row.appendChild(fCell);
+
+            // 创建G列单元格，根据是否存在对应数据进行显示，不存在则显示为空字符串
+            const gCell = document.createElement('td');
+            gCell.textContent = processedData['G'] && processedData['G'].length > i ? processedData['G'][i] : '';
+            gCell.style.backgroundColor = '#bed9d7';
+            row.appendChild(gCell);
+
+            // 创建H列单元格，根据是否存在对应数据进行显示，不存在则显示为空字符串
+            const hCell = document.createElement('td');
+            hCell.textContent = processedData['H'] && processedData['H'].length > i ? processedData['H'][i] : '';
+            hCell.style.backgroundColor = '#fff5e6';
+            row.appendChild(hCell);
+
+            // 创建I列单元格，根据是否存在对应数据进行显示，不存在则以空字符串显示
+            const iCell = document.createElement('td');
+            iCell.textContent = processedData['I'] && processedData['I'].length > i ? processedData['I'][i] : '';
+            iCell.style.backgroundColor = '#bed9d7';
+            row.appendChild(iCell);
+
+            // 创建J列单元格，根据是否存在对应数据进行显示，不存在则以空字符串显示
+            const jCell = document.createElement('td');
+            jCell.textContent = processedData['J'] && processedData['J'].length > i ? processedData['J'][i] : '';
+            jCell.style.backgroundColor = '#bed9d7';
+            row.appendChild(jCell);
+
+            // 创建K列单元格，根据是否存在对应数据进行显示，不存在则以空字符串显示
+            const kCell = document.createElement('td');
+            kCell.textContent = processedData['K'] && processedData['K'].length > i ? processedData['K'][i] : '';
+            kCell.style.backgroundColor = '#bed9d7';
+            row.appendChild(kCell);
+
+            // 创建L列单元格，根据是否存在对应数据进行显示，不存在则以空字符串显示
+            const lCell = document.createElement('td');
+            lCell.textContent = processedData['L'] && processedData['L'].length > i ? processedData['L'][i] : '';
+            lCell.style.backgroundColor = '#fff5e6';
+            row.appendChild(lCell);
+
+            // 创建M列单元格，根据是否存在对应数据进行显示，不存在则以空字符串显示
+            const mCell = document.createElement('td');
+            mCell.textContent = processedData['M'] && processedData['M'].length > i ? processedData['M'][i] : '';
+            mCell.style.backgroundColor = '#bed9d7';
+            row.appendChild(mCell);
+
+            // 创建N列单元格，根据是否存在对应数据进行显示，不存在则以空字符串显示
+            const nCell = document.createElement('td');
+            nCell.textContent = processedData['N'] && processedData['N'].length > i ? processedData['N'][i] : '';
+            nCell.style.backgroundColor = '#fff5e6';
+            row.appendChild(nCell);
+
+            // 创建O列单元格，根据是否存在对应数据进行显示，不存在则以空字符串显示
+            const oCell = document.createElement('td');
+            oCell.textContent = processedData['O'] && processedData['O'].length > i ? processedData['O'][i] : '';
+            oCell.style.backgroundColor = '#bed9d7';
+            row.appendChild(oCell);
+
+            // 创建P列单元格，根据是否存在对应数据进行显示，不存在则以空字符串显示
+            const pCell = document.createElement('td');
+            pCell.textContent = processedData['P'] && processedData['P'].length > i ? processedData['P'][i] : '';
+            pCell.style.backgroundColor = '#fff5e6';
+            row.appendChild(pCell);
+
+            // 将当前行添加到表格中
+            table.appendChild(row);
+        }
+
+        // 将填充好数据的表格添加到结果展示区域
+        resultDiv.appendChild(table);
+    }
+
+    window.onload = function () {
+        // 示例：假设从本地存储中恢复数据
+        const savedData = localStorage.getItem('savedData');
+        if (savedData) {
+            data = JSON.parse(savedData);
+
+            // 将本地数据转换为类似DataFrame结构的数据（这里简单使用对象数组模拟）
+            let df = {
+                'A': data['A'],
+                'B': data['B']
+            };
+
+            // 调用模拟的compare_strings函数进行数据处理
+            let result_df = compareStrings(df);
+
+            // 将处理后的结果数据存储到processedData中
+            processedData = result_df;
+
+            // 调用结果展示函数更新前端展示
+            displayResult();
+        }
+    }
+
+    </script>
+</body>
+
+</html>
